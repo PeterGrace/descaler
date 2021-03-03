@@ -5,8 +5,8 @@ mod timer_loop;
 use std::fs;
 use std::env;
 use hyper::{
-    service::{make_service_fn, service_fn},
-    Server
+    Server,
+    service::{make_service_fn, service_fn}
 };
 use anyhow::{bail, Result};
 use log::info;
@@ -18,7 +18,6 @@ static COMPRESSED_DEPENDENCY_LIST: &[u8] = auditable::inject_dependency_list!();
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()>{
-    std::env::set_var("RUST_LOG", "info,kube=info");
     env_logger::init();
     let metrics_addr = ([0, 0, 0, 0], 9898).into();
     let serve_future = Server::bind(&metrics_addr).serve(make_service_fn(|_| async {
