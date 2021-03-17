@@ -1,6 +1,7 @@
 mod lib;
 mod metrics;
 mod timer_loop;
+mod tests;
 
 use std::fs;
 use std::env;

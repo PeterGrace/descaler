@@ -26,3 +26,7 @@ backoff = { version = "0.3.0", features = ["tokio"]}
 
 [build-dependencies]
 auditable-build = "0.1"
+
+[dev-dependencies]
+httpmock = "0.5.5"
+httpmock-macros = "0.4.0"
