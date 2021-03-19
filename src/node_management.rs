@@ -48,6 +48,11 @@ pub async fn node_enumerate_loop(cfg: Arc<std::sync::Mutex<AppConfig>>,status: A
         }
 
         let scaling_enabled = status.lock().unwrap().scaling_enabled;
+        if scaling_enabled {
+            info!("Scaling is enabled, so will be removing annotations, if required.")
+        } else {
+            info!("Scaling is disabled, so we shall set annotations to stop scaling.")
+        }
 
         let nodes: Api<Node> = Api::all(client.clone());
         for node in nodes.list(&lp).await? {

@@ -24,6 +24,11 @@ pub async fn scaler_enumerate_loop(cfg: Arc<std::sync::Mutex<AppConfig>> ,status
 
     loop {
         interval.tick().await;
+        if cfg.lock().unwrap().last_valid_scaler_config_at == 0 {
+            info!("have not received valid scaler config yet, sleeping this node interval.");
+            continue;
+        }
+
         debug!("scaler timer interval fired.");
 
         let hpas: Api<HorizontalPodAutoscaler> = Api::all(client.clone());
