@@ -6,7 +6,7 @@ use backoff::future::retry;
 use std::sync::{Arc, Mutex};
 use crate::lib::config::{ScalerConfig, ScalerResource, AppConfig};
 use kube::{
-    api::{Api, ListParams},
+    api::{Api, ListParams, PatchParams},
     Client,
 };
 use k8s_openapi::api::core::v1::Node;
@@ -15,9 +15,10 @@ use futures::{StreamExt, TryStreamExt};
 use std::collections::HashMap;
 use kube_runtime::utils::try_flatten_applied;
 use kube_runtime::watcher;
-use kube::api::{Meta, ObjectMeta};
+use kube::api::{Meta, ObjectMeta, Patch};
+use std::time::SystemTime;
 
-async fn remove_node_annotation(node: &Node)  {
+async fn remove_node_annotation(node: &mut Node)  {
     let mut annotations = node.metadata.annotations.clone().unwrap();
 
     if annotations.contains_key("vsix.me/descaler-enabled-at") {
@@ -29,10 +30,18 @@ async fn remove_node_annotation(node: &Node)  {
     {
         debug!("No annotation found, leaving node alone: {}", Meta::name(node));
     }
+    node.metadata.annotations = Some(annotations);
 }
 
-async fn apply_node_annotation(node: &Node)  {
-    warn!("Not implemented yet.");
+async fn apply_node_annotation(node: &mut Node)  {
+    let mut annotations = node.metadata.annotations.clone().unwrap();
+
+    if !annotations.contains_key("cluster-autoscaler.kubernetes.io/scale-down-disabled") {
+        debug!("Adding scale-down-disable annotation to node {}", Meta::name(node));
+        annotations.insert(String::from("cluster-autoscaler.kubernetes.io/scale-down-disabled"), String::from("true"));
+        annotations.insert(String::from("vsix.me/descaler-enabled-at"), SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs().to_string());
+    }
+    node.metadata.annotations = Some(annotations);
 }
 
 pub async fn node_enumerate_loop(cfg: Arc<std::sync::Mutex<AppConfig>>,status: Arc<std::sync::Mutex<ScalerConfig>>) -> Result<()>{
@@ -55,14 +64,26 @@ pub async fn node_enumerate_loop(cfg: Arc<std::sync::Mutex<AppConfig>>,status: A
         }
 
         let nodes: Api<Node> = Api::all(client.clone());
-        for node in nodes.list(&lp).await? {
+        for mut node in nodes.list(&lp).await? {
             debug!("Found node {}", Meta::name(&node));
             if scaling_enabled {
-                remove_node_annotation(&node).await;
+                remove_node_annotation(&mut node).await;
             }
             else {
-                apply_node_annotation(&node).await;
+                apply_node_annotation(&mut node).await;
             }
+            node = nodes.patch(node.metadata.name.as_ref().unwrap(), &PatchParams::apply("descaler"),
+                        &Patch::Apply(
+                            {
+                                Node {
+                                    metadata: ObjectMeta {
+                                        annotations: Some(node.metadata.annotations.unwrap()),
+                                        ..ObjectMeta::default()
+                                    },
+                                    .. Node::default()
+                                }
+                            }
+                        )).await?;
         }
 
     }
