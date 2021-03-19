@@ -1,3 +1,5 @@
 ---
+source_url: 'http://localhost'
 check_interval: 10
-source_url: http://localhost
+enumerate_nodes_secs: 30
+enumerate_scalers_secs: 30

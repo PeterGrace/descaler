@@ -1,5 +1,7 @@
 #[cfg(test)]
-use httpmock::{Mock, MockServer, Method::{GET, POST}};
+use httpmock::{MockServer, Method::{GET, POST}};
+use crate::status_management::fetch_url;
+
 
 
 #[tokio::test]
@@ -7,19 +9,10 @@ async fn test_send_hook() {
     let mock_server = MockServer::start();
     let search_mock = mock_server.mock(|when, then| {
         when.method(GET)
-            .path("/mockpost");
+            .path("/descaler.yaml");
         then.status(200)
         .body(String::from("---"));
 
     });
-
-    // let response = send_hook(
-    //     mock_server.url("/mockpost").to_string(),
-    //     String::from("POST"),
-    //     String::from("{}"),
-    // )
-    //     .await
-    //     .unwrap();
-    //assert_eq!(response.status(), 200);
-    //assert_eq!(search_mock.hits(), 1);
+    assert_eq!("---", fetch_url(mock_server.url("/descaler.yaml").as_str()).await.unwrap());
 }

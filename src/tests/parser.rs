@@ -1,19 +1,32 @@
-use crate::lib::config::{ScalerConfig, ScalerResource};
+use crate::lib::config::AppConfig;
 use anyhow::{Result, Error};
-
-macro_rules! assert_err {
-    ($expression:expr, $($pattern:tt)+) => {
-        match $expression {
-            $($pattern)+ => (),
-            ref e => panic!("expected `{}` but got `{:?}`", stringify!($($pattern)+), e),
-        }
-    }
-}
-
-
 #[cfg(test)]
-fn test_scalerconfig_invalid_yaml(){
+use crate::assert_err;
+
+
+
+#[test]
+fn test_app_config_invalid_yaml(){
     let test_string = String::from("@#%@#^@#^%^$%#^@#$@#$%^");
-    let obj = ScalerConfig::from_string(test_string);
-    assert_err!(obj,anyhow::Error);
+    let obj = serde_yaml::from_str::<AppConfig>(test_string.as_str());
+    assert_err!(obj, Err(serde_yaml::Error{ .. }));
+}
+#[test]
+fn test_app_config_valid_yaml()
+{
+    const input_data: &str = "
+---
+source_url: 'http://localhost'
+check_interval: 10
+enumerate_nodes_secs: 30
+enumerate_scalers_secs: 30
+";
+    let value = serde_yaml::from_str::<AppConfig>(input_data).unwrap();
+    let control: AppConfig = AppConfig {
+        source_url: String::from("http://localhost"),
+        check_interval: 10,
+        enumerate_nodes_secs: 30,
+        enumerate_scalers_secs: 30
+    };
+    assert_eq!(value, control)
 }
