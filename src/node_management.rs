@@ -18,33 +18,33 @@ use kube_runtime::watcher;
 use kube::api::{Meta, ObjectMeta, Patch};
 use std::time::SystemTime;
 
-async fn remove_node_annotation(node: &mut Node)  {
+async fn remove_node_annotation(node: &mut Node) -> bool{
     let mut annotations = node.metadata.annotations.clone().unwrap();
 
     if annotations.contains_key("vsix.me/descaler-enabled-at") {
         debug!("Found descaler-enabled-at key, deleting annotations for {}", Meta::name(node));
         annotations.remove("vsix.me/descaler-enabled-at");
         annotations.remove("cluster-autoscaler.kubernetes.io/scale-down-disabled");
+        node.metadata.annotations = Some(annotations);
+        return true;
     }
-    else
-    {
-        debug!("No annotation found, leaving node alone: {}", Meta::name(node));
-    }
-    node.metadata.annotations = Some(annotations);
+    return false;
 }
 
-async fn apply_node_annotation(node: &mut Node)  {
+async fn apply_node_annotation(node: &mut Node) -> bool {
     let mut annotations = node.metadata.annotations.clone().unwrap();
 
     if !annotations.contains_key("cluster-autoscaler.kubernetes.io/scale-down-disabled") {
         debug!("Adding scale-down-disable annotation to node {}", Meta::name(node));
         annotations.insert(String::from("cluster-autoscaler.kubernetes.io/scale-down-disabled"), String::from("true"));
         annotations.insert(String::from("vsix.me/descaler-enabled-at"), SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs().to_string());
-    }
-    node.metadata.annotations = Some(annotations);
+        node.metadata.annotations = Some(annotations);
+        return true;
+    };
+    return false;
 }
 
-pub async fn node_enumerate_loop(cfg: Arc<std::sync::Mutex<AppConfig>>,status: Arc<std::sync::Mutex<ScalerConfig>>) -> Result<()>{
+pub async fn node_enumerate_loop(cfg: Arc<std::sync::Mutex<AppConfig>>, status: Arc<std::sync::Mutex<ScalerConfig>>) -> Result<()> {
     let mut interval = tokio::time::interval(Duration::from_secs(cfg.lock().unwrap().enumerate_nodes_secs as u64));
     let client = Client::try_default().await?;
     let lp = ListParams::default().allow_bookmarks();
@@ -66,28 +66,35 @@ pub async fn node_enumerate_loop(cfg: Arc<std::sync::Mutex<AppConfig>>,status: A
         let nodes: Api<Node> = Api::all(client.clone());
         for mut node in nodes.list(&lp).await? {
             debug!("Found node {}", Meta::name(&node));
+            let mut changes: bool;
             if scaling_enabled {
-                remove_node_annotation(&mut node).await;
+                changes = remove_node_annotation(&mut node).await;
+            } else {
+                changes = apply_node_annotation(&mut node).await;
             }
-            else {
-                apply_node_annotation(&mut node).await;
+            if changes {
+                match nodes.patch(node.metadata.name.as_ref().unwrap(), &PatchParams::apply("descaler"),
+                                  &Patch::Apply(
+                                      {
+                                          Node {
+                                              metadata: ObjectMeta {
+                                                  annotations: Some(node.metadata.annotations.unwrap()),
+                                                  ..ObjectMeta::default()
+                                              },
+                                              ..Node::default()
+                                          }
+                                      }
+                                  )).await {
+                    Ok(_) => {
+                        info!("Node modified: {}", node.metadata.name.unwrap());
+                    }
+                    Err(e) => {
+                        warn!("Could not amend node {}: {:?}", node.metadata.name.unwrap(), e);
+                    }
+                }
             }
-            node = nodes.patch(node.metadata.name.as_ref().unwrap(), &PatchParams::apply("descaler"),
-                        &Patch::Apply(
-                            {
-                                Node {
-                                    metadata: ObjectMeta {
-                                        annotations: Some(node.metadata.annotations.unwrap()),
-                                        ..ObjectMeta::default()
-                                    },
-                                    .. Node::default()
-                                }
-                            }
-                        )).await?;
         }
-
     }
     debug!("node timer work completed,  awaiting next interval.");
     Ok(())
-
 }
