@@ -85,12 +85,11 @@ async fn process_keda_scaled_object(client: Client, hpa: HorizontalPodAutoscaler
     };
     debug!("Got scaled object {}/{}",Meta::namespace(&our_object).unwrap(),Meta::name(&our_object));
     let mut annotations = our_object.metadata.annotations.clone().unwrap();
-    let current_replicas = hpa.status.unwrap().current_replicas;
     if scaling_enabled {
-        if annotations.contains_key("vsix.me/descaler-original-replicas") {
+        if annotations.contains_key("vsix.me/descaler-original-min-replicas") {
             debug!("Found original replicas key, adjusting values.");
-            let replica_count = annotations.get("vsix.me/descaler-original-replicas").unwrap().parse::<i32>().unwrap();
-            annotations.remove("vsix.me/descaler-original-replicas");
+            let original_min_replica_count = annotations.get("vsix.me/descaler-original-min-replicas").unwrap().parse::<i32>().unwrap();
+            annotations.remove("vsix.me/descaler-original-min-replicas");
             let patch = Patch::Apply(
                 ScaledObject {
                     metadata: ObjectMeta {
@@ -100,7 +99,7 @@ async fn process_keda_scaled_object(client: Client, hpa: HorizontalPodAutoscaler
                     spec: ScaledObjectSpec {
                         triggers: our_object.spec.triggers,
                         scale_target_ref: our_object.spec.scale_target_ref,
-                        min_replica_count: Some(replica_count),
+                        min_replica_count: Some(original_min_replica_count),
                         .. ScaledObjectSpec::default()
                     },
                         .. ScaledObject::default()
@@ -118,9 +117,10 @@ async fn process_keda_scaled_object(client: Client, hpa: HorizontalPodAutoscaler
 
         }
     } else {
-        if !annotations.contains_key("vsix.me/descaler-original-replicas") {
+        if !annotations.contains_key("vsix.me/descaler-original-min-replicas") {
             debug!("Found object that needs to have scaling locked.");
-            annotations.insert(String::from("vsix.me/descaler-original-replicas"), our_object.spec.min_replica_count.unwrap().to_string());
+            let current_replicas = hpa.status.unwrap().current_replicas;
+            annotations.insert(String::from("vsix.me/descaler-original-min-replicas"), our_object.spec.min_replica_count.unwrap().to_string());
             let patch = Patch::Apply(
                 ScaledObject {
                     metadata: ObjectMeta {
@@ -147,9 +147,6 @@ async fn process_keda_scaled_object(client: Client, hpa: HorizontalPodAutoscaler
             }
         }
     }
-
-
-
 }
 async fn process_keda_scaled_job(client: Client, hpa: HorizontalPodAutoscaler,name: String, scaling_enabled: bool) {
     warn!("not implemented");
