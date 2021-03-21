@@ -1,9 +1,6 @@
-use prometheus::{Encoder, GaugeVec, TextEncoder, register_gauge_vec};
-use hyper::{
-    header::CONTENT_TYPE,
-    Body, Request, Response,
-};
+use hyper::{header::CONTENT_TYPE, Body, Request, Response};
 use lazy_static::lazy_static;
+use prometheus::{register_gauge_vec, Encoder, GaugeVec, TextEncoder};
 
 // create a static prometheus metric for the app and git hash version.
 lazy_static! {

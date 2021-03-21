@@ -9,7 +9,6 @@
  */
 
 
-use reqwest;
 
 pub struct Configuration {
     pub base_path: String,
