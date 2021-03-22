@@ -14,7 +14,6 @@ jobs:
       - name: Push to Docker Hub
         uses: docker/build-push-action@v1
         with:
-          file: ./Dockerfile
           username: petergrace
           password: ${{ secrets.HUB_DOCKER_PAT }}
           repository: petergrace/descaler
