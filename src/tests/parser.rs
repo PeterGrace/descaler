@@ -24,6 +24,7 @@ enumerate_scalers_secs: 30
         check_interval: 10,
         enumerate_nodes_secs: 30,
         enumerate_scalers_secs: 30,
+        .. AppConfig::default()
     };
     assert_eq!(value, control)
 }
