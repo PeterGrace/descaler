@@ -17,5 +17,6 @@ RUN apt-get -y update \
 RUN mkdir /app
 COPY --from=builder /src/target/release/descaler /app/descaler
 WORKDIR /app
+USER 1000
 CMD ["/app/descaler"]
 
