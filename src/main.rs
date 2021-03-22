@@ -19,12 +19,20 @@ use log::info;
 use std::env;
 use std::fs;
 use std::sync::{Arc, Mutex};
+use clap::{App, load_yaml};
 
 // populate auditable dependency structure for library chain-of-custody controls
 static COMPRESSED_DEPENDENCY_LIST: &[u8] = auditable::inject_dependency_list!();
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    let yaml = load_yaml!("clap_definition.yaml");
+    let matches = App::from_yaml(yaml).get_matches();
+    match matches.is_present("debug") {
+        true => { std::env::set_var("RUST_LOG", "debug") }
+        false => ()
+    };
+
     env_logger::init();
     let metrics_addr = ([0, 0, 0, 0], 9898).into();
     let serve_future = Server::bind(&metrics_addr).serve(make_service_fn(|_| async {

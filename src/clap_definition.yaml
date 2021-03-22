@@ -1,0 +1,8 @@
+---
+name: descaler
+args:
+  - debug:
+      required: false
+      short: d
+      long: debug
+      takes_value: false

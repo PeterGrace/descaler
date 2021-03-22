@@ -21,7 +21,11 @@ pub async fn scaler_enumerate_loop(
     let mut interval = tokio::time::interval(Duration::from_secs(
         cfg.lock().unwrap().enumerate_scalers_secs as u64,
     ));
-    let client = Client::try_default().await?;
+    debug!("enter scaler_enumerate_loop");
+    let client = match Client::try_default().await {
+        Ok(c) => c,
+        Err(e) => panic!("Unable to connect to kubernetes backend.  This is fatal.  Error: {:?}", e)
+    };
     let lp = ListParams::default().allow_bookmarks();
 
     loop {
