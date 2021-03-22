@@ -1,0 +1,21 @@
+name: Release
+
+on:
+  release:
+    types:
+      - created
+    
+jobs:
+  generate: 
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Push to Docker Hub
+        uses: docker/build-push-action@v1
+        with:
+          file: ./Dockerfile
+          username: petergrace
+          password: ${{ secrets.HUB_DOCKER_PAT }}
+          repository: petergrace/descaler
+          tag_with_ref: true
