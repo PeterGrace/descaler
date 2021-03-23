@@ -1,0 +1,10 @@
+apiVersion: v1
+data:
+  scaler.yaml: |
+    ---
+    scalingEnabled: true
+    ignore: []
+
+kind: ConfigMap
+metadata:
+  name: descaler-scaler-yaml

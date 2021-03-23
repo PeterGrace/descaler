@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: descaler
+  name: descaler
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: descaler
+  template:
+    metadata:
+      labels:
+        app: descaler
+    spec:
+      serviceAccountName: descaler
+      containers:
+      - image: petergrace/descaler:v0.1.2
+        name: descaler
+        env:
+          - name: DESCALER_CONFIG_YAML
+            value: "/config/config.yaml"
+          - name: RUST_LOG
+            value: "info"
+        resources: 
+          requests:
+            cpu: 100m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+        volumeMounts:
+          - name: configfile
+            mountPath: /config/
+          - name: scaleryaml
+            mountPath: /scaler/
+      volumes:
+        - name: configfile
+          configMap:
+            name: descaler-config
+        - name: scaleryaml
+          configMap:
+            name: descaler-scaler-yaml
