@@ -31,7 +31,7 @@ pub async fn scaler_enumerate_loop(
     loop {
         interval.tick().await;
         if cfg.lock().unwrap().last_valid_scaler_config_at == 0 {
-            info!("have not received valid scaler config yet, sleeping this node interval.");
+            info!("have not received valid scaler config yet, sleeping this scaler interval.");
             continue;
         }
         debug!("scaler timer interval fired.");
