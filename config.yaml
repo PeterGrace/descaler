@@ -1,5 +1,5 @@
 ---
-source_url: 'file:///scaler.yaml'
+source_url: 'file://./scaler.yaml'
 check_interval: 10
 enumerate_nodes_secs: 30
 enumerate_scalers_secs: 30

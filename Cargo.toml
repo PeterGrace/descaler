@@ -29,6 +29,8 @@ reqwest = { version = "0.11.1"}
 backoff = { version = "0.3.0", features = ["tokio"]}
 futures = "0.3"
 clap = {version = "2", features = ["suggestions", "color", "yaml"]}
+strum = "0.20.0"
+strum_macros = "0.20.1"
 
 [dependencies.openapi-scaledobjects]
 path = "scaledobjects.keda.sh-rust"

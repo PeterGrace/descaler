@@ -1,4 +1,4 @@
-use crate::lib::config::{AppConfig, ScalerConfig};
+use crate::lib::config::{AppConfig, ScalerConfig, ScalerType};
 use anyhow::Result;
 use k8s_openapi::api::autoscaling::v2beta1::HorizontalPodAutoscaler;
 use k8s_openapi::api::autoscaling::v2beta1::HorizontalPodAutoscalerSpec;
@@ -13,6 +13,10 @@ use openapi_scaledobjects::models::scaled_object::ScaledObjectSpec;
 use openapi_scaledobjects::models::ScaledObject;
 use std::sync::Arc;
 use tokio::time::Duration;
+use crate::metrics::{METRIC_PATCH_DURATION, METRIC_PATCH_SUCCESS, METRIC_PATCH_FAILURE};
+use std::time::SystemTime;
+
+
 
 pub async fn scaler_enumerate_loop(
     cfg: Arc<std::sync::Mutex<AppConfig>>,
@@ -39,7 +43,8 @@ pub async fn scaler_enumerate_loop(
 
         let hpas: Api<HorizontalPodAutoscaler> = Api::all(client.clone());
         for hpa in hpas.list(&lp).await? {
-            let mut scaler_type: ScalerType = ScalerType::HPA;
+            let start = SystemTime::now();
+            let mut scaler_type: ScalerType = ScalerType::HorizontalPodAutoscaler;
             if hpa.metadata.owner_references.is_some() {
                 for owner in hpa.metadata.owner_references.clone().unwrap() {
                     scaler_type = match owner.kind.as_str() {
@@ -52,7 +57,7 @@ pub async fn scaler_enumerate_loop(
                     }
                 }
             }
-            match scaler_type {
+            match scaler_type.clone() {
                 ScalerType::ScaledObject(s) => {
                     debug!("Found a hpa backed by a ScaledObject, actioning on that instead.");
                     process_keda_scaled_object(client.clone(), hpa.clone(), s, scaling_enabled)
@@ -62,11 +67,16 @@ pub async fn scaler_enumerate_loop(
                     debug!("Found a hpa backed by a ScaledJob, actioning on that instead.");
                     process_keda_scaled_job(client.clone(), hpa.clone(), s, scaling_enabled).await;
                 }
-                ScalerType::HPA => {
+                ScalerType::HorizontalPodAutoscaler => {
                     debug!("This is a bare HPA without keda, actioning on this object.");
                     process_hpa(client.clone(), &hpa, scaling_enabled).await;
                 }
-            }
+                ScalerType::Node => {
+                    warn!("We received a scaler_type of Node, but in object scaler handler code.  This should not happen.");
+                }
+            };
+            let end = SystemTime::now();
+            METRIC_PATCH_DURATION.with_label_values(&[scaler_type.as_ref()]).observe(end.duration_since(start).unwrap().as_millis() as f64);
         }
     }
 }
@@ -105,6 +115,7 @@ async fn process_hpa(client: Client, hpa: &HorizontalPodAutoscaler, scaling_enab
                 .await
             {
                 Ok(_) => {
+                    METRIC_PATCH_SUCCESS.with_label_values(&[format!("{}", scaling_enabled).as_str(), ScalerType::HorizontalPodAutoscaler.as_ref()]).inc();
                     info!(
                         "Scaling Enabled for HPA {}/{}",
                         hpa.metadata.namespace.as_ref().unwrap(),
@@ -112,6 +123,7 @@ async fn process_hpa(client: Client, hpa: &HorizontalPodAutoscaler, scaling_enab
                     );
                 }
                 Err(e) => {
+                    METRIC_PATCH_FAILURE.with_label_values(&[format!("{}", scaling_enabled).as_str(), "hpa"]).inc();
                     warn!("Unable to patch ScaledObject: {:?}", e);
                 }
             }
@@ -145,6 +157,7 @@ async fn process_hpa(client: Client, hpa: &HorizontalPodAutoscaler, scaling_enab
                 .await
             {
                 Ok(_) => {
+                    METRIC_PATCH_SUCCESS.with_label_values(&[format!("{}", scaling_enabled).as_str(), ScalerType::HorizontalPodAutoscaler.as_ref()]).inc();
                     info!(
                         "Scaling Disabled for HPA {}/{}",
                         hpa.metadata.namespace.as_ref().unwrap(),
@@ -152,6 +165,7 @@ async fn process_hpa(client: Client, hpa: &HorizontalPodAutoscaler, scaling_enab
                     );
                 }
                 Err(e) => {
+                    METRIC_PATCH_FAILURE.with_label_values(&[format!("{}", scaling_enabled).as_str(), ScalerType::HorizontalPodAutoscaler.as_ref()]).inc();
                     warn!("Unable to patch ScaledObject: {:?}", e);
                 }
             }
@@ -170,6 +184,7 @@ async fn process_keda_scaled_object(
     let our_object: ScaledObject = match scaled_objects.get(name.as_str()).await {
         Ok(obj) => (obj),
         Err(e) => {
+            METRIC_PATCH_FAILURE.with_label_values(&[format!("{}", scaling_enabled).as_str(), ScalerType::ScaledObject("".to_string()).as_ref()]).inc();
             warn!(
                 "Unable to get ScaledObject {}/{}: {:?}",
                 Meta::namespace(&hpa).unwrap(),
@@ -212,6 +227,7 @@ async fn process_keda_scaled_object(
                 .await
             {
                 Ok(_) => {
+                    METRIC_PATCH_SUCCESS.with_label_values(&[format!("{}", scaling_enabled).as_str(), ScalerType::ScaledObject("".to_string()).as_ref()]).inc();
                     info!(
                         "Scaling Enabled for ScaledObject {}/{}",
                         hpa.metadata.namespace.unwrap(),
@@ -219,6 +235,7 @@ async fn process_keda_scaled_object(
                     );
                 }
                 Err(e) => {
+                    METRIC_PATCH_FAILURE.with_label_values(&[format!("{}", scaling_enabled).as_str(), ScalerType::ScaledObject("".to_string()).as_ref()]).inc();
                     warn!("Unable to patch ScaledObject: {:?}", e);
                 }
             }
@@ -250,6 +267,7 @@ async fn process_keda_scaled_object(
                 .await
             {
                 Ok(_) => {
+                    METRIC_PATCH_SUCCESS.with_label_values(&[format!("{}", scaling_enabled).as_str(), ScalerType::ScaledObject("".to_string()).as_ref()]).inc();
                     info!(
                         "Scaling Disabled for ScaledObject {}/{}",
                         hpa.metadata.namespace.unwrap(),
@@ -257,6 +275,7 @@ async fn process_keda_scaled_object(
                     );
                 }
                 Err(e) => {
+                    METRIC_PATCH_FAILURE.with_label_values(&[format!("{}", scaling_enabled).as_str(), ScalerType::ScaledObject("".to_string()).as_ref()]).inc();
                     warn!("Unable to patch ScaledObject: {:?}", e);
                 }
             }
@@ -274,10 +293,4 @@ async fn process_keda_scaled_job(
     // I'm leaving this stub here, however, in case they later do support such a thing, in which
     // case we'd need to do some further processing.
     info!("ScaledJob found.  They have no minreplicas to adjust as of March, 2021.");
-}
-
-enum ScalerType {
-    ScaledObject(String),
-    ScaledJob(String),
-    HPA,
 }

@@ -1,4 +1,4 @@
-use crate::lib::config::{AppConfig, ScalerConfig};
+use crate::lib::config::{AppConfig, ScalerConfig, ScalerType};
 use anyhow::Result;
 use k8s_openapi::api::core::v1::Node;
 use kube::api::{Meta, ObjectMeta, Patch};
@@ -10,6 +10,7 @@ use log::{debug, info, warn};
 use std::sync::Arc;
 use std::time::SystemTime;
 use tokio::time::Duration;
+use crate::metrics::{METRIC_PATCH_DURATION, METRIC_PATCH_SUCCESS, METRIC_PATCH_FAILURE};
 
 async fn remove_node_annotation(node: &mut Node) -> bool {
     let mut annotations = node.metadata.annotations.clone().unwrap();
@@ -82,6 +83,7 @@ pub async fn node_enumerate_loop(
 
         let nodes: Api<Node> = Api::all(client.clone());
         for mut node in nodes.list(&lp).await? {
+            let start = SystemTime::now();
             debug!("Found node {}", Meta::name(&node));
             let changes: bool;
             if scaling_enabled {
@@ -107,9 +109,11 @@ pub async fn node_enumerate_loop(
                     .await
                 {
                     Ok(_) => {
+                        METRIC_PATCH_SUCCESS.with_label_values(&[format!("{}", scaling_enabled).as_str(), ScalerType::Node.as_ref()]).inc();
                         info!("Node modified: {}", node.metadata.name.unwrap());
                     }
                     Err(e) => {
+                        METRIC_PATCH_FAILURE.with_label_values(&[format!("{}", scaling_enabled).as_str(), ScalerType::Node.as_ref()]).inc();
                         warn!(
                             "Could not amend node {}: {:?}",
                             node.metadata.name.unwrap(),
@@ -117,7 +121,9 @@ pub async fn node_enumerate_loop(
                         );
                     }
                 }
-            }
+            };
+            let end = SystemTime::now();
+            METRIC_PATCH_DURATION.with_label_values(&[ScalerType::Node.as_ref()]).observe(end.duration_since(start).unwrap().as_millis() as f64);
         }
     }
 }

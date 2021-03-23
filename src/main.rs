@@ -42,8 +42,11 @@ async fn main() -> Result<()> {
         std::env::var("DESCALER_CONFIG_YAML").unwrap_or_else(|_| String::from("config.yaml"));
 
     let appdata_gauge =
-        metrics::APPVER.with_label_values(&[env!("CARGO_PKG_VERSION"), env!("GIT_HASH")]);
+        metrics::METRIC_APPVER.with_label_values(&[env!("CARGO_PKG_VERSION"), env!("GIT_HASH")]);
     appdata_gauge.set(1.0);
+    metrics::METRIC_PATCH_FAILURE.reset();
+    metrics::METRIC_PATCH_SUCCESS.reset();
+    metrics::METRIC_PATCH_DURATION.reset();
     tokio::spawn(async move { serve_future.await });
     info!(
         "Service spawned, crate v{} hash:{}, auditable_dependency_payload_size:{:#?}",

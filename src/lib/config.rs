@@ -1,4 +1,6 @@
 use serde::Deserialize;
+use strum_macros::AsRefStr;
+
 
 #[derive(Debug, Deserialize, PartialEq, Default)]
 pub struct AppConfig {
@@ -22,4 +24,12 @@ pub struct ScalerResource {
     pub kind: String,
     pub namespace: String,
     pub name: String,
+}
+
+#[derive(AsRefStr, Clone, Debug, PartialEq)]
+pub(crate) enum ScalerType {
+    Node,
+    ScaledObject(String),
+    ScaledJob(String),
+    HorizontalPodAutoscaler,
 }

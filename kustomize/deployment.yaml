@@ -13,11 +13,18 @@ spec:
     metadata:
       labels:
         app: descaler
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: "/metrics"
     spec:
       serviceAccountName: descaler
       containers:
       - image: petergrace/descaler:v0.1.2
         name: descaler
+        ports:
+          - name: metrics
+            protocol: TCP
+            containerPort: 9898
         env:
           - name: DESCALER_CONFIG_YAML
             value: "/config/config.yaml"
