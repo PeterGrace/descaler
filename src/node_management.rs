@@ -82,7 +82,7 @@ pub async fn node_enumerate_loop(
         }
 
         let nodes: Api<Node> = Api::all(client.clone());
-        for mut node in nodes.list(&lp).await? {
+        for mut node in nodes.list(&lp).await.expect("unable to enumerate nodes") {
             let start = SystemTime::now();
             debug!("Found node {}", Meta::name(&node));
             let changes: bool;

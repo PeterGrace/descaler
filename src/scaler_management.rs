@@ -42,7 +42,7 @@ pub async fn scaler_enumerate_loop(
         let scaling_enabled = status.lock().unwrap().scaling_enabled;
 
         let hpas: Api<HorizontalPodAutoscaler> = Api::all(client.clone());
-        for hpa in hpas.list(&lp).await? {
+        for hpa in hpas.list(&lp).await.expect("Unable to list hpas") {
             let start = SystemTime::now();
             let mut scaler_type: ScalerType = ScalerType::HorizontalPodAutoscaler;
             if hpa.metadata.owner_references.is_some() {
