@@ -14,6 +14,8 @@ RUN apt-get -y update \
  && apt-get -y install libssl1.1
 
 # APP
+RUN apt-get -y update \
+ && apt-get -y install ca-certificates
 RUN mkdir /app
 COPY --from=builder /src/target/release/descaler /app/descaler
 WORKDIR /app
