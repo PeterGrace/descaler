@@ -26,7 +26,7 @@ pub async fn fetch_url(url: &str) -> std::result::Result<String, reqwest::Error>
         retry(backoff, || async {
             Ok(reqwest::get(url).await?.text().await?)
         })
-        .await
+            .await
     }
 }
 
@@ -45,10 +45,10 @@ pub async fn scaler_status_update_loop(
             Ok(s) => s,
             Err(e) => {
                 if e.is_timeout() {
-                    warn!("timeout loading url {}.", url);
+                    warn!("timeout loading url {}: {:?}.", url, e);
                 }
                 if e.is_connect() {
-                    warn!("error connecting to url {}.", url);
+                    warn!("error connecting to url {}: {:?}.", url, e);
                 }
                 if e.is_status() {
                     warn!(
