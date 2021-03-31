@@ -1,7 +1,7 @@
 use crate::lib::config::{AppConfig, ScalerConfig, ScalerType};
 use anyhow::Result;
-use k8s_openapi::api::autoscaling::v2beta1::HorizontalPodAutoscaler;
-use k8s_openapi::api::autoscaling::v2beta1::HorizontalPodAutoscalerSpec;
+use k8s_openapi::api::autoscaling::v1::HorizontalPodAutoscaler;
+use k8s_openapi::api::autoscaling::v1::HorizontalPodAutoscalerSpec;
 use kube::api::{Meta, ObjectMeta, Patch, PatchParams};
 use kube::{
     api::{Api, ListParams},
@@ -98,13 +98,31 @@ async fn process_hpa(client: Client, hpa: &HorizontalPodAutoscaler, scaling_enab
             let patch = Patch::Apply(HorizontalPodAutoscaler {
                 metadata: ObjectMeta {
                     annotations: Some(annotations),
-                    ..ObjectMeta::default()
+
+                    cluster_name: None,
+                    creation_timestamp: None,
+                    deletion_grace_period_seconds: None,
+                    deletion_timestamp: None,
+                    finalizers: None,
+                    generate_name: None,
+                    generation: None,
+                    labels: None,
+                    managed_fields: None,
+                    name: None,
+                    namespace: None,
+                    owner_references: None,
+                    resource_version: None,
+                    self_link: None,
+                    uid: None
                 },
                 spec: Some(HorizontalPodAutoscalerSpec {
+                    max_replicas: hpa.clone().spec.unwrap().max_replicas,
                     min_replicas: Some(original_min_replica_count),
-                    ..HorizontalPodAutoscalerSpec::default()
+
+                    scale_target_ref: Default::default(),
+                    target_cpu_utilization_percentage: None
                 }),
-                ..HorizontalPodAutoscaler::default()
+                status: None
             });
             match hpas
                 .patch(
@@ -124,7 +142,7 @@ async fn process_hpa(client: Client, hpa: &HorizontalPodAutoscaler, scaling_enab
                 }
                 Err(e) => {
                     METRIC_PATCH_FAILURE.with_label_values(&[format!("{}", scaling_enabled).as_str(), "hpa"]).inc();
-                    warn!("Unable to patch ScaledObject: {:?}", e);
+                    warn!("Unable to patch HPA: {:?}", e);
                 }
             }
         }
@@ -139,13 +157,29 @@ async fn process_hpa(client: Client, hpa: &HorizontalPodAutoscaler, scaling_enab
             let patch = Patch::Apply(HorizontalPodAutoscaler {
                 metadata: ObjectMeta {
                     annotations: Some(annotations),
-                    ..ObjectMeta::default()
+                    cluster_name: None,
+                    creation_timestamp: None,
+                    deletion_grace_period_seconds: None,
+                    deletion_timestamp: None,
+                    finalizers: None,
+                    generate_name: None,
+                    generation: None,
+                    labels: None,
+                    managed_fields: None,
+                    name: None,
+                    namespace: None,
+                    owner_references: None,
+                    resource_version: None,
+                    self_link: None,
+                    uid: None
                 },
                 spec: Some(HorizontalPodAutoscalerSpec {
+                    max_replicas: hpa.clone().spec.unwrap().max_replicas,
                     min_replicas: Some(current_replicas),
-                    ..HorizontalPodAutoscalerSpec::default()
+                    scale_target_ref: Default::default(),
+                    target_cpu_utilization_percentage: None
                 }),
-                ..HorizontalPodAutoscaler::default()
+                status: None
             });
 
             match hpas
@@ -166,7 +200,7 @@ async fn process_hpa(client: Client, hpa: &HorizontalPodAutoscaler, scaling_enab
                 }
                 Err(e) => {
                     METRIC_PATCH_FAILURE.with_label_values(&[format!("{}", scaling_enabled).as_str(), ScalerType::HorizontalPodAutoscaler.as_ref()]).inc();
-                    warn!("Unable to patch ScaledObject: {:?}", e);
+                    warn!("Unable to patch HPA: {:?}", e);
                 }
             }
         }
@@ -212,15 +246,33 @@ async fn process_keda_scaled_object(
             let patch = Patch::Apply(ScaledObject {
                 metadata: ObjectMeta {
                     annotations: Some(annotations),
-                    ..ObjectMeta::default()
+                    cluster_name: None,
+                    creation_timestamp: None,
+                    deletion_grace_period_seconds: None,
+                    deletion_timestamp: None,
+                    finalizers: None,
+                    generate_name: None,
+                    generation: None,
+                    labels: None,
+                    managed_fields: None,
+                    name: None,
+                    namespace: None,
+                    owner_references: None,
+                    resource_version: None,
+                    self_link: None,
+                    uid: None
                 },
                 spec: ScaledObjectSpec {
-                    triggers: our_object.spec.triggers,
-                    scale_target_ref: our_object.spec.scale_target_ref,
+                    advanced: None,
+                    cooldown_period: None,
+                    triggers: our_object.clone().spec.triggers,
+                    scale_target_ref: our_object.clone().spec.scale_target_ref,
                     min_replica_count: Some(original_min_replica_count),
-                    ..ScaledObjectSpec::default()
+                    max_replica_count: None,
+                    polling_interval: None
                 },
-                ..ScaledObject::default()
+                api_version: our_object.clone().api_version,
+                kind: our_object.clone().kind
             });
             match scaled_objects
                 .patch(name.as_str(), &PatchParams::apply("descaler"), &patch)
@@ -251,17 +303,34 @@ async fn process_keda_scaled_object(
             let patch = Patch::Apply(ScaledObject {
                 metadata: ObjectMeta {
                     annotations: Some(annotations),
-                    ..ObjectMeta::default()
+                    cluster_name: None,
+                    creation_timestamp: None,
+                    deletion_grace_period_seconds: None,
+                    deletion_timestamp: None,
+                    finalizers: None,
+                    generate_name: None,
+                    generation: None,
+                    labels: None,
+                    managed_fields: None,
+                    name: None,
+                    namespace: None,
+                    owner_references: None,
+                    resource_version: None,
+                    self_link: None,
+                    uid: None
                 },
                 spec: ScaledObjectSpec {
-                    triggers: our_object.spec.triggers,
-                    scale_target_ref: our_object.spec.scale_target_ref,
+                    advanced: None,
+                    cooldown_period: None,
+                    triggers: our_object.clone().spec.triggers,
+                    scale_target_ref: our_object.clone().spec.scale_target_ref,
                     min_replica_count: Some(current_replicas),
-                    ..ScaledObjectSpec::default()
+                    max_replica_count: None,
+                    polling_interval: None
                 },
-                ..ScaledObject::default()
+                api_version: our_object.clone().api_version,
+                kind: our_object.clone().kind
             });
-
             match scaled_objects
                 .patch(name.as_str(), &PatchParams::apply("descaler"), &patch)
                 .await
