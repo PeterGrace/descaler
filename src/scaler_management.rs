@@ -17,7 +17,6 @@ use crate::metrics::{METRIC_PATCH_DURATION, METRIC_PATCH_SUCCESS, METRIC_PATCH_F
 use std::time::SystemTime;
 
 
-
 pub async fn scaler_enumerate_loop(
     cfg: Arc<std::sync::Mutex<AppConfig>>,
     status: Arc<std::sync::Mutex<ScalerConfig>>,
@@ -113,16 +112,15 @@ async fn process_hpa(client: Client, hpa: &HorizontalPodAutoscaler, scaling_enab
                     owner_references: None,
                     resource_version: None,
                     self_link: None,
-                    uid: None
+                    uid: None,
                 },
                 spec: Some(HorizontalPodAutoscalerSpec {
                     max_replicas: hpa.clone().spec.unwrap().max_replicas,
                     min_replicas: Some(original_min_replica_count),
-
-                    scale_target_ref: Default::default(),
-                    target_cpu_utilization_percentage: None
+                    scale_target_ref: hpa.clone().spec.unwrap().scale_target_ref,
+                    target_cpu_utilization_percentage: None,
                 }),
-                status: None
+                status: None,
             });
             match hpas
                 .patch(
@@ -171,15 +169,15 @@ async fn process_hpa(client: Client, hpa: &HorizontalPodAutoscaler, scaling_enab
                     owner_references: None,
                     resource_version: None,
                     self_link: None,
-                    uid: None
+                    uid: None,
                 },
                 spec: Some(HorizontalPodAutoscalerSpec {
                     max_replicas: hpa.clone().spec.unwrap().max_replicas,
                     min_replicas: Some(current_replicas),
-                    scale_target_ref: Default::default(),
-                    target_cpu_utilization_percentage: None
+                    scale_target_ref: hpa.clone().spec.unwrap().scale_target_ref,
+                    target_cpu_utilization_percentage: None,
                 }),
-                status: None
+                status: None,
             });
 
             match hpas
@@ -260,7 +258,7 @@ async fn process_keda_scaled_object(
                     owner_references: None,
                     resource_version: None,
                     self_link: None,
-                    uid: None
+                    uid: None,
                 },
                 spec: ScaledObjectSpec {
                     advanced: None,
@@ -269,10 +267,10 @@ async fn process_keda_scaled_object(
                     scale_target_ref: our_object.clone().spec.scale_target_ref,
                     min_replica_count: Some(original_min_replica_count),
                     max_replica_count: None,
-                    polling_interval: None
+                    polling_interval: None,
                 },
                 api_version: our_object.clone().api_version,
-                kind: our_object.clone().kind
+                kind: our_object.clone().kind,
             });
             match scaled_objects
                 .patch(name.as_str(), &PatchParams::apply("descaler"), &patch)
@@ -317,7 +315,7 @@ async fn process_keda_scaled_object(
                     owner_references: None,
                     resource_version: None,
                     self_link: None,
-                    uid: None
+                    uid: None,
                 },
                 spec: ScaledObjectSpec {
                     advanced: None,
@@ -326,10 +324,10 @@ async fn process_keda_scaled_object(
                     scale_target_ref: our_object.clone().spec.scale_target_ref,
                     min_replica_count: Some(current_replicas),
                     max_replica_count: None,
-                    polling_interval: None
+                    polling_interval: None,
                 },
                 api_version: our_object.clone().api_version,
-                kind: our_object.clone().kind
+                kind: our_object.clone().kind,
             });
             match scaled_objects
                 .patch(name.as_str(), &PatchParams::apply("descaler"), &patch)
