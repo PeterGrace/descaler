@@ -121,9 +121,9 @@ pub async fn node_enumerate_loop(
                         );
                     }
                 }
+                let end = SystemTime::now();
+                METRIC_PATCH_DURATION.with_label_values(&[ScalerType::Node.as_ref()]).observe(end.duration_since(start).unwrap().as_millis() as f64);
             };
-            let end = SystemTime::now();
-            METRIC_PATCH_DURATION.with_label_values(&[ScalerType::Node.as_ref()]).observe(end.duration_since(start).unwrap().as_millis() as f64);
         }
     }
 }
