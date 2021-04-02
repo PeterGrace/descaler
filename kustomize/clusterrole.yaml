@@ -1,0 +1,36 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: descaler-edit
+rules:
+- apiGroups:
+  - ''
+  resources:
+  - 'nodes'
+  verbs:
+  - 'get'
+  - 'list'
+  - 'watch'
+  - 'put'
+  - 'patch'
+- apiGroups:
+  - 'autoscaling'
+  resources:
+  - 'horizontalpodautoscalers'
+  verbs:
+  - 'get'
+  - 'list'
+  - 'watch'
+  - 'put'
+  - 'patch'
+- apiGroups:
+  - 'keda.sh'
+  resources:
+  - 'ScaledObjects'
+  - 'ScaledJobs'
+  verbs:
+  - 'get'
+  - 'list'
+  - 'watch'
+  - 'put'
+  - 'patch'
