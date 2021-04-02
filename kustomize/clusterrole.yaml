@@ -26,8 +26,8 @@ rules:
 - apiGroups:
   - 'keda.sh'
   resources:
-  - 'ScaledObjects'
-  - 'ScaledJobs'
+  - 'scaledobjects'
+  - 'scaledjobs'
   verbs:
   - 'get'
   - 'list'
