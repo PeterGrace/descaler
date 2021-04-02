@@ -8,3 +8,5 @@ resources:
 - sa.yaml
 - configmap-descaler-config.yaml
 - configmap-scaler-yaml.yaml
+- clusterrole.yaml
+- clusterrolebinding.yaml
