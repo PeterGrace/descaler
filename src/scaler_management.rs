@@ -1,18 +1,19 @@
 use crate::lib::config::{AppConfig, ScalerConfig, ScalerType};
 use anyhow::Result;
 use k8s_openapi::api::autoscaling::v1::HorizontalPodAutoscaler;
-use k8s_openapi::api::autoscaling::v1::HorizontalPodAutoscalerSpec;
-use kube::api::{Meta, ObjectMeta, Patch, PatchParams};
+//use k8s_openapi::api::autoscaling::v1::HorizontalPodAutoscalerSpec;
+use kube::api::{Meta, Patch, PatchParams};
 use kube::{
     api::{Api, ListParams},
     Client,
 };
 use log::{debug, info, warn};
 //use openapi_scaledjobs::models::ScaledJob;
-use openapi_scaledobjects::models::scaled_object::ScaledObjectSpec;
+//use openapi_scaledobjects::models::scaled_object::ScaledObjectSpec;
 use openapi_scaledobjects::models::ScaledObject;
 use std::sync::Arc;
 use tokio::time::Duration;
+use serde_json::json;
 use crate::metrics::{METRIC_PATCH_DURATION, METRIC_PATCH_SUCCESS, METRIC_PATCH_FAILURE};
 use std::time::SystemTime;
 
@@ -97,39 +98,21 @@ async fn process_hpa(client: Client, hpa: &HorizontalPodAutoscaler, scaling_enab
                 .parse::<i32>()
                 .unwrap();
             annotations.remove("vsix.me/descaler-original-min-replicas");
-            let patch = Patch::Apply(HorizontalPodAutoscaler {
-                metadata: ObjectMeta {
-                    annotations: Some(annotations),
-
-                    cluster_name: None,
-                    creation_timestamp: None,
-                    deletion_grace_period_seconds: None,
-                    deletion_timestamp: None,
-                    finalizers: None,
-                    generate_name: None,
-                    generation: None,
-                    labels: None,
-                    managed_fields: None,
-                    name: None,
-                    namespace: None,
-                    owner_references: None,
-                    resource_version: None,
-                    self_link: None,
-                    uid: None,
-                },
-                spec: Some(HorizontalPodAutoscalerSpec {
-                    max_replicas: hpa.clone().spec.unwrap().max_replicas,
-                    min_replicas: Some(original_min_replica_count),
-                    scale_target_ref: hpa.clone().spec.unwrap().scale_target_ref,
-                    target_cpu_utilization_percentage: None,
-                }),
-                status: None,
-            });
+            annotations.insert(String::from("$patch"), String::from("replace"));
+            let jsonpatch = json!({
+                    "metadata": {
+                        "resourceVersion": hpa.metadata.resource_version.as_ref().unwrap(),
+                        "annotations": annotations
+                    },
+                    "spec": {
+                    "min_replicas": original_min_replica_count
+                    }
+                });
             match hpas
                 .patch(
                     hpa.metadata.name.as_ref().unwrap().as_str(),
-                    &PatchParams::apply("descaler"),
-                    &patch,
+                    &PatchParams::default(),
+                    &Patch::Strategic(&jsonpatch),
                 )
                 .await
             {
@@ -140,12 +123,12 @@ async fn process_hpa(client: Client, hpa: &HorizontalPodAutoscaler, scaling_enab
                         hpa.metadata.namespace.as_ref().unwrap(),
                         hpa.metadata.name.as_ref().unwrap()
                     );
-                    return true
+                    return true;
                 }
                 Err(e) => {
                     METRIC_PATCH_FAILURE.with_label_values(&[format!("{}", scaling_enabled).as_str(), "hpa"]).inc();
                     warn!("Unable to patch HPA: {:?}", e);
-                    return false
+                    return false;
                 }
             }
         }
@@ -157,39 +140,20 @@ async fn process_hpa(client: Client, hpa: &HorizontalPodAutoscaler, scaling_enab
                 String::from("vsix.me/descaler-original-min-replicas"),
                 hpa.spec.as_ref().unwrap().min_replicas.unwrap().to_string(),
             );
-            let patch = Patch::Apply(HorizontalPodAutoscaler {
-                metadata: ObjectMeta {
-                    annotations: Some(annotations),
-                    cluster_name: None,
-                    creation_timestamp: None,
-                    deletion_grace_period_seconds: None,
-                    deletion_timestamp: None,
-                    finalizers: None,
-                    generate_name: None,
-                    generation: None,
-                    labels: None,
-                    managed_fields: None,
-                    name: None,
-                    namespace: None,
-                    owner_references: None,
-                    resource_version: None,
-                    self_link: None,
-                    uid: None,
-                },
-                spec: Some(HorizontalPodAutoscalerSpec {
-                    max_replicas: hpa.clone().spec.unwrap().max_replicas,
-                    min_replicas: Some(current_replicas),
-                    scale_target_ref: hpa.clone().spec.unwrap().scale_target_ref,
-                    target_cpu_utilization_percentage: None,
-                }),
-                status: None,
-            });
-
+            let jsonpatch = json!({
+                    "metadata": {
+                        "resourceVersion": hpa.metadata.resource_version.as_ref().unwrap(),
+                        "annotations": annotations
+                    },
+                    "spec": {
+                    "min_replicas": current_replicas
+                    }
+                });
             match hpas
                 .patch(
                     hpa.metadata.name.as_ref().unwrap().as_str(),
-                    &PatchParams::apply("descaler"),
-                    &patch,
+                    &PatchParams::default(),
+                    &Patch::Merge(&jsonpatch),
                 )
                 .await
             {
@@ -200,12 +164,12 @@ async fn process_hpa(client: Client, hpa: &HorizontalPodAutoscaler, scaling_enab
                         hpa.metadata.namespace.as_ref().unwrap(),
                         hpa.metadata.name.as_ref().unwrap()
                     );
-                    return true
+                    return true;
                 }
                 Err(e) => {
                     METRIC_PATCH_FAILURE.with_label_values(&[format!("{}", scaling_enabled).as_str(), ScalerType::HorizontalPodAutoscaler.as_ref()]).inc();
                     warn!("Unable to patch HPA: {:?}", e);
-                    return false
+                    return false;
                 }
             }
         }
@@ -249,39 +213,22 @@ async fn process_keda_scaled_object(
                 .parse::<i32>()
                 .unwrap();
             annotations.remove("vsix.me/descaler-original-min-replicas");
-            let patch = Patch::Apply(ScaledObject {
-                metadata: ObjectMeta {
-                    annotations: Some(annotations),
-                    cluster_name: None,
-                    creation_timestamp: None,
-                    deletion_grace_period_seconds: None,
-                    deletion_timestamp: None,
-                    finalizers: None,
-                    generate_name: None,
-                    generation: None,
-                    labels: None,
-                    managed_fields: None,
-                    name: None,
-                    namespace: None,
-                    owner_references: None,
-                    resource_version: None,
-                    self_link: None,
-                    uid: None,
-                },
-                spec: ScaledObjectSpec {
-                    advanced: None,
-                    cooldown_period: None,
-                    triggers: our_object.clone().spec.triggers,
-                    scale_target_ref: our_object.clone().spec.scale_target_ref,
-                    min_replica_count: Some(original_min_replica_count),
-                    max_replica_count: None,
-                    polling_interval: None,
-                },
-                api_version: our_object.clone().api_version,
-                kind: our_object.clone().kind,
-            });
+            annotations.insert(String::from("$patch"), String::from("replace"));
+            let jsonpatch = json!({
+                    "metadata": {
+                        "resourceVersion": our_object.metadata.resource_version.unwrap(),
+                        "annotations": annotations
+                    },
+                    "spec": {
+                    "min_replica_count": original_min_replica_count
+                    }
+                });
             match scaled_objects
-                .patch(name.as_str(), &PatchParams::apply("descaler"), &patch)
+                .patch(
+                    name.as_str(),
+                    &PatchParams::default(),
+                    &Patch::Strategic(&jsonpatch),
+                )
                 .await
             {
                 Ok(_) => {
@@ -308,39 +255,21 @@ async fn process_keda_scaled_object(
                 String::from("vsix.me/descaler-original-min-replicas"),
                 our_object.spec.min_replica_count.unwrap().to_string(),
             );
-            let patch = Patch::Apply(ScaledObject {
-                metadata: ObjectMeta {
-                    annotations: Some(annotations),
-                    cluster_name: None,
-                    creation_timestamp: None,
-                    deletion_grace_period_seconds: None,
-                    deletion_timestamp: None,
-                    finalizers: None,
-                    generate_name: None,
-                    generation: None,
-                    labels: None,
-                    managed_fields: None,
-                    name: None,
-                    namespace: None,
-                    owner_references: None,
-                    resource_version: None,
-                    self_link: None,
-                    uid: None,
-                },
-                spec: ScaledObjectSpec {
-                    advanced: None,
-                    cooldown_period: None,
-                    triggers: our_object.clone().spec.triggers,
-                    scale_target_ref: our_object.clone().spec.scale_target_ref,
-                    min_replica_count: Some(current_replicas),
-                    max_replica_count: None,
-                    polling_interval: None,
-                },
-                api_version: our_object.clone().api_version,
-                kind: our_object.clone().kind,
-            });
+            let jsonpatch = json!({
+                    "metadata": {
+                        "resourceVersion": our_object.metadata.resource_version.unwrap(),
+                        "annotations": annotations
+                    },
+                    "spec": {
+                    "min_replica_count": current_replicas
+                    }
+                });
             match scaled_objects
-                .patch(name.as_str(), &PatchParams::apply("descaler"), &patch)
+                .patch(
+                    name.as_str(),
+                    &PatchParams::default(),
+                    &Patch::Merge(&jsonpatch),
+                )
                 .await
             {
                 Ok(_) => {

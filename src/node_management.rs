@@ -1,7 +1,7 @@
 use crate::lib::config::{AppConfig, ScalerConfig, ScalerType};
 use anyhow::Result;
 use k8s_openapi::api::core::v1::Node;
-use kube::api::{Meta, ObjectMeta, Patch};
+use kube::api::{Meta, Patch};
 use kube::{
     api::{Api, ListParams, PatchParams},
     Client,
@@ -10,6 +10,7 @@ use log::{debug, info, warn};
 use std::sync::Arc;
 use std::time::SystemTime;
 use tokio::time::Duration;
+use serde_json::json;
 use crate::metrics::{METRIC_PATCH_DURATION, METRIC_PATCH_SUCCESS, METRIC_PATCH_FAILURE};
 
 async fn remove_node_annotation(node: &mut Node) -> bool {
@@ -22,6 +23,7 @@ async fn remove_node_annotation(node: &mut Node) -> bool {
         );
         annotations.remove("vsix.me/descaler-enabled-at");
         annotations.remove("cluster-autoscaler.kubernetes.io/scale-down-disabled");
+        annotations.insert(String::from("$patch"), String::from("replace"));
         node.metadata.annotations = Some(annotations);
         return true;
     }
@@ -92,19 +94,17 @@ pub async fn node_enumerate_loop(
                 changes = apply_node_annotation(&mut node).await;
             }
             if changes {
+                let jsonpatch = json!({
+                    "metadata": {
+                        "resourceVersion": node.metadata.resource_version.unwrap(),
+                        "annotations": node.metadata.annotations.unwrap()
+                    },
+                });
                 match nodes
                     .patch(
                         node.metadata.name.as_ref().unwrap(),
-                        &PatchParams::apply("descaler"),
-                        &Patch::Apply({
-                            Node {
-                                metadata: ObjectMeta {
-                                    annotations: Some(node.metadata.annotations.unwrap()),
-                                    ..ObjectMeta::default()
-                                },
-                                ..Node::default()
-                            }
-                        }),
+                        &PatchParams::default(),
+                        &Patch::Strategic(&jsonpatch)
                     )
                     .await
                 {

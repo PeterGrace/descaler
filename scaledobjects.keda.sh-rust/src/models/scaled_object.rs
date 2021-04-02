@@ -20,7 +20,8 @@ kind = "ScaledObject",
 version = "v1alpha1",
 namespaced,
 derive = "PartialEq",
-derive = "Default"
+derive = "Default",
+apiextensions="v1beta1"
 )]
 pub struct ScaledObjectSpec {
     #[serde(rename = "advanced", skip_serializing_if = "Option::is_none")]

@@ -22,7 +22,8 @@ use serde::{Deserialize, Serialize};
     version = "v1alpha1",
     namespaced,
     derive="PartialEq",
-    derive="Default"
+    derive="Default",
+    apiextensions="v1beta1"
 )]
 pub struct ScaledJobSpec {
     #[serde(rename = "envSourceContainerName", skip_serializing_if = "Option::is_none")]
