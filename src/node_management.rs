@@ -76,9 +76,9 @@ pub async fn node_enumerate_loop(
 
         let scaling_enabled = status.lock().unwrap().scaling_enabled;
         if scaling_enabled {
-            info!("Scaling is enabled, so will be removing annotations, if required.")
+            debug!("Scaling is enabled, so will be removing annotations, if required.")
         } else {
-            info!("Scaling is disabled, so we shall set annotations to stop scaling.")
+            debug!("Scaling is disabled, so we shall set annotations to stop scaling.")
         }
 
         let nodes: Api<Node> = Api::all(client.clone());
